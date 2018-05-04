@@ -8,7 +8,43 @@ using Microsoft.Azure.EventHubs.Processor;
 
 namespace AzureEventHubs
 {
-    public class EventHubConsumer : IMessageConsumer, IEventProcessor
+    public class EventProcessor : IEventProcessor
+    {
+        private readonly EventHubConsumer _consumer;
+
+        public EventProcessor(EventHubConsumer consumer)
+        {
+            _consumer = consumer;
+        }
+
+        public Task OpenAsync(PartitionContext context)
+        {
+            _consumer.FireOnPartitionsAssignedEvent($"{context.PartitionId}");
+            return Task.CompletedTask;
+        }
+
+        public Task CloseAsync(PartitionContext context, CloseReason reason)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task ProcessEventsAsync(PartitionContext context, IEnumerable<EventData> messages)
+        {
+            foreach (var eventData in messages)
+            {
+                _consumer.OnMessageReceived(Encoding.UTF8.GetString(eventData.Body.Array, eventData.Body.Offset, eventData.Body.Count));
+            }
+            return Task.CompletedTask;
+        }
+
+        public Task ProcessErrorAsync(PartitionContext context, Exception error)
+        {
+            return Task.CompletedTask;
+        }
+
+    }
+
+    public class EventHubConsumer : IMessageConsumer, IEventProcessorFactory
     {
         private Action<string> _callback;
         private readonly EventProcessorHost _eventProcessorHost;
@@ -26,7 +62,7 @@ namespace AzureEventHubs
         public void Subscribe(Action<string> callback)
         {
             _callback = callback;
-            _eventProcessorHost.RegisterEventProcessorAsync<EventHubConsumer>()
+            _eventProcessorHost.RegisterEventProcessorFactoryAsync(this)
                 .Wait();
         }
 
@@ -36,31 +72,21 @@ namespace AzureEventHubs
                 .Wait();
         }
 
-        public Task OpenAsync(PartitionContext context)
+        internal void FireOnPartitionsAssignedEvent(string partitionsAssigned)
         {
-            OnPartitionsAssignedEvent?.Invoke(this, $"{context.PartitionId}");
-            return Task.CompletedTask;
+            OnPartitionsAssignedEvent?.Invoke(this, partitionsAssigned);
         }
 
-        public Task CloseAsync(PartitionContext context, CloseReason reason)
+        internal void OnMessageReceived(string message)
         {
-            return Task.CompletedTask;
-        }
-
-        public Task ProcessEventsAsync(PartitionContext context, IEnumerable<EventData> messages)
-        {
-            foreach (var eventData in messages)
-            {
-                _callback?.Invoke(Encoding.UTF8.GetString(eventData.Body.Array, eventData.Body.Offset, eventData.Body.Count));
-            }
-            return Task.CompletedTask;
-        }
-
-        public Task ProcessErrorAsync(PartitionContext context, Exception error)
-        {
-            return Task.CompletedTask;
+            _callback?.Invoke(message);
         }
 
         public event EventHandler<string> OnPartitionsAssignedEvent;
+
+        public IEventProcessor CreateEventProcessor(PartitionContext context)
+        {
+            return new EventProcessor(this);
+        }
     }
 }

@@ -21,7 +21,8 @@ namespace DistLogDemo
 
     class Program
     {
-        static async Task MainAsync(string[] args)
+        // Coming in C#7.1 static async Task Main(string[] args)
+        static void Main(string[] args)
         {
             if (args.Length != 3
                 || !Enum.TryParse<ProduceOrConsume>(args[0], true, out var produceConsumeType)
@@ -37,8 +38,9 @@ namespace DistLogDemo
             if (produceConsumeType == ProduceOrConsume.Produce)
             {
                 var producer = CreateProducer(distLogType, topicName);
-                await Task.WhenAll(Enumerable.Range(0, 10)
-                    .Select(i => producer.Produce($"Message #{i}")));
+                Task.WhenAll(Enumerable.Range(0, 10)
+                    .Select(i => producer.Produce($"Message #{i}")))
+                    .Wait();
             }
             else
             {
@@ -57,7 +59,7 @@ namespace DistLogDemo
         private const string OffsetContainer = "huboffsets";
 
 
-        static IMessageConsumer CreateConsumer(DistLogType distLogType, string topicName)
+        private static IMessageConsumer CreateConsumer(DistLogType distLogType, string topicName)
         {
             return distLogType == DistLogType.Kafka
                 ? (IMessageConsumer)new KafkaConsumer(topicName, KafkaBrokers, consumerGroup: $"DemoConsumer{Guid.NewGuid()}")
@@ -65,7 +67,7 @@ namespace DistLogDemo
                     OffsetContainer);
         }
 
-        static IMessageProducer CreateProducer(DistLogType distLogType, string topicName)
+        private static IMessageProducer CreateProducer(DistLogType distLogType, string topicName)
         {
             return distLogType == DistLogType.Kafka
                 ? (IMessageProducer) new KafkaProducer(topicName, KafkaBrokers)

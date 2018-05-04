@@ -20,7 +20,14 @@ namespace AzureEventHubs
 
         public async Task<bool> Produce(string message, string publishKey = null)
         {
-            await _eventHubClient.SendAsync(new EventData(Encoding.UTF8.GetBytes(message)), publishKey);
+            if (publishKey != null)
+            {
+                await _eventHubClient.SendAsync(new EventData(Encoding.UTF8.GetBytes(message)), publishKey);
+            }
+            else
+            {
+                await _eventHubClient.SendAsync(new EventData(Encoding.UTF8.GetBytes(message)));
+            }
             return true;
         }
     }
