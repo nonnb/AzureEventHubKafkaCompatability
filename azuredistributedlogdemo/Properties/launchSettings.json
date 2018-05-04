@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DistLogDemo": {
+      "commandName": "Project",
+      "commandLineArgs": "consume kafka MyTopic"
+    }
+  }
+}
