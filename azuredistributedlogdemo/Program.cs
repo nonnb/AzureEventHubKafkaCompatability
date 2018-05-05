@@ -24,16 +24,23 @@ namespace DistLogDemo
         // Coming in C#7.1 static async Task Main(string[] args)
         static void Main(string[] args)
         {
-            if (args.Length != 3
+            if (args.Length < 3
                 || !Enum.TryParse<ProduceOrConsume>(args[0], true, out var produceConsumeType)
                 || !Enum.TryParse<DistLogType>(args[1], true, out var distLogType))
             {
-                Console.WriteLine($"Usage: dotnet DistLogDemo {{produce|consume}} {{kafka|azureeventhubs}} TopicName");
+                Console.WriteLine($"Usage: dotnet DistLogDemo {{produce|consume}} {{kafka|azureeventhubs}} TopicName [ConsumerGroupName]");
                 return;
             }
 
             var topicName = args[2];
-            Console.WriteLine($"{produceConsumeType} to/from {distLogType} on Topic {topicName}");
+            var consumerGroupName = args.Length >= 4
+                ? args[3]
+                : $"DemoConsumer{Guid.NewGuid()}";
+
+            Console.WriteLine($"{produceConsumeType} to/from {distLogType} on Topic {topicName}" + 
+                              (produceConsumeType == ProduceOrConsume.Consume 
+                                  ? $" for Group {consumerGroupName}" 
+                                  : ""));
 
             if (produceConsumeType == ProduceOrConsume.Produce)
             {
@@ -44,7 +51,7 @@ namespace DistLogDemo
             }
             else
             {
-                var consumer = CreateConsumer(distLogType, topicName);
+                var consumer = CreateConsumer(distLogType, topicName, consumerGroupName);
                 consumer.Subscribe(msg => Console.WriteLine($"Message : {msg} received on Topic: {topicName}"));
                 consumer.OnPartitionsAssignedEvent += (sender, s) => Console.WriteLine($"Partitions Assigned : {s}");
                 Console.WriteLine("Consumer Listening - Enter to Quit");
@@ -58,13 +65,12 @@ namespace DistLogDemo
         private const string OffsetStorageConnectionString = "DefaultEndpointsProtocol=https;AccountName=eventhboffsets;AccountKey=nRFgG68bh1YkyzAxzxyYmxLhoEhtMZAJttOLqFjzJTmBsqQ3GoLLIA7TPQ8dT4BYfCrLqc0n5+rr9Ux3+Xuvzg==;EndpointSuffix=core.windows.net";
         private const string OffsetContainer = "huboffsets";
 
-
-        private static IMessageConsumer CreateConsumer(DistLogType distLogType, string topicName)
+        private static IMessageConsumer CreateConsumer(DistLogType distLogType, string topicName, string consumerGroupName)
         {
             return distLogType == DistLogType.Kafka
-                ? (IMessageConsumer)new KafkaConsumer(topicName, KafkaBrokers, consumerGroup: $"DemoConsumer{Guid.NewGuid()}")
+                ? (IMessageConsumer)new KafkaConsumer(topicName, KafkaBrokers, consumerGroupName)
                 : new EventHubConsumer(AzureEventHubConnectionString, topicName, OffsetStorageConnectionString,
-                    OffsetContainer);
+                    OffsetContainer, consumerGroupName);
         }
 
         private static IMessageProducer CreateProducer(DistLogType distLogType, string topicName)

@@ -25,6 +25,7 @@ namespace AzureEventHubs
 
         public Task CloseAsync(PartitionContext context, CloseReason reason)
         {
+            _consumer.FireOnPartitionsAssignedEvent($"Closed: {context.PartitionId}");
             return Task.CompletedTask;
         }
 
@@ -34,14 +35,14 @@ namespace AzureEventHubs
             {
                 _consumer.OnMessageReceived(Encoding.UTF8.GetString(eventData.Body.Array, eventData.Body.Offset, eventData.Body.Count));
             }
-            return Task.CompletedTask;
+            return context.CheckpointAsync();
         }
 
         public Task ProcessErrorAsync(PartitionContext context, Exception error)
         {
+            _consumer.FireOnError($"Error - Partition: {context.PartitionId} - {error.Message}");
             return Task.CompletedTask;
         }
-
     }
 
     public class EventHubConsumer : IMessageConsumer, IEventProcessorFactory
@@ -49,11 +50,11 @@ namespace AzureEventHubs
         private Action<string> _callback;
         private readonly EventProcessorHost _eventProcessorHost;
         public EventHubConsumer(string eventHubConnectionString, string topic,
-            string storageConnectionString, string storageContainer)
+            string storageConnectionString, string storageContainer, string consumerGroupName)
         {
             _eventProcessorHost = new EventProcessorHost(
                 topic,
-                PartitionReceiver.DefaultConsumerGroupName,
+                consumerGroupName,
                 eventHubConnectionString,
                 storageConnectionString,
                 storageContainer);
@@ -77,12 +78,18 @@ namespace AzureEventHubs
             OnPartitionsAssignedEvent?.Invoke(this, partitionsAssigned);
         }
 
+        internal void FireOnError(string error)
+        {
+            OnError?.Invoke(this, error);
+        }
+
         internal void OnMessageReceived(string message)
         {
             _callback?.Invoke(message);
         }
 
         public event EventHandler<string> OnPartitionsAssignedEvent;
+        public event EventHandler<string> OnError;
 
         public IEventProcessor CreateEventProcessor(PartitionContext context)
         {

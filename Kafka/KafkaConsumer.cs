@@ -38,10 +38,10 @@ namespace Kafka
             _cancellationTokenSource = new CancellationTokenSource();
 //            _consumer.OnPartitionsAssigned += (sender, list) =>
 //            {
-//                Task.Run(() => OnPartitionsAssignedEvent
+//                OnPartitionsAssignedEvent
 //                    ?.Invoke(sender, string.Join(",", list.Select(p => p.Partition))));
 //            };
-            _consumer.OnError += (sender, error) => Console.WriteLine($"Error: {error.Reason}");
+            _consumer.OnError += (sender, error) => OnPartitionsAssignedEvent?.Invoke(sender, error.Reason);
         }
 
         public void Subscribe(Action<string> callback)
@@ -69,5 +69,6 @@ namespace Kafka
         }
 
         public event EventHandler<string> OnPartitionsAssignedEvent;
+        public event EventHandler<string> OnError;
     }
 }

@@ -7,5 +7,6 @@ namespace Common
         void Subscribe(Action<string> callback);
         void Stop();
         event EventHandler<string> OnPartitionsAssignedEvent;
+        event EventHandler<string> OnError;
     }
 }
