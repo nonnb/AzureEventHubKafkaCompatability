@@ -21,7 +21,7 @@ namespace DistLogDemo
 
     class Program
     {
-        // Coming in C#7.1 static async Task Main(string[] args)
+        // Coming in C#7.1 static async Task Main(string[] args) and then no .GetAwaiter().Wait() nonsense.
         static void Main(string[] args)
         {
             if (args.Length < 3
@@ -60,11 +60,13 @@ namespace DistLogDemo
             }
         }
 
-        private const string KafkaBrokers = "stubuntu.eastus.cloudapp.azure.com:9092";
-        private const string AzureEventHubConnectionString = "Endpoint=sb://cteventhubs.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=UNSuxAxGH447VVU3rQ1DtSL8ToLjpQa1Y4wmORn12a0=";
-        private const string OffsetStorageConnectionString = "DefaultEndpointsProtocol=https;AccountName=eventhboffsets;AccountKey=nRFgG68bh1YkyzAxzxyYmxLhoEhtMZAJttOLqFjzJTmBsqQ3GoLLIA7TPQ8dT4BYfCrLqc0n5+rr9Ux3+Xuvzg==;EndpointSuffix=core.windows.net";
+        private const string KafkaBrokers = "YourKafkaHere:9092";
+        // Easiest is to copy these from the appropriate resource on the Azure Portal
+        private const string AzureEventHubConnectionString = "Endpoint=sb://xxx/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=xxx";
+        private const string OffsetStorageConnectionString = "DefaultEndpointsProtocol=https;AccountName=youreventhuboffsetsaccountname;AccountKey=xx;EndpointSuffix=core.windows.net";
         private const string OffsetContainer = "huboffsets";
 
+        // Simple factory methods for either Kafka or AzEventHubs
         private static IMessageConsumer CreateConsumer(DistLogType distLogType, string topicName, string consumerGroupName)
         {
             return distLogType == DistLogType.Kafka
