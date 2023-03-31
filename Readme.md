@@ -1,4 +1,4 @@
-#Azure Event Hubs - Kafka compatability Demo
+#Azure Event Hubs - Kafka compatability Demo#
 
 The following opinions are taken:
 
@@ -9,4 +9,4 @@ The following opinions are taken:
  
 Kafka stores the offsets on an internal Topic (Event Hubs used to store Offsets on a Separate Blob Storage account)
   
-Whenever partitions are assigned or revoked by the broker, consumers are alerted 
+Whenever partitions are assigned or revoked by the broker, consumers write out their new assignments.
