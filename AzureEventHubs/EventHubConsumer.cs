@@ -89,6 +89,7 @@ namespace AzureEventHubs
         }
 
         public event EventHandler<string> OnPartitionsAssignedEvent;
+        public event EventHandler<string> OnPartitionsLostEvent;
         public event EventHandler<string> OnError;
 
         public IEventProcessor CreateEventProcessor(PartitionContext context)

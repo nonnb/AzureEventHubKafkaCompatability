@@ -1,18 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using AzureEventHubs;
 using Common;
 using Kafka;
 
 namespace DistLogDemo
 {
-    public enum DistLogType
-    {
-        Kafka,
-        AzureEventHubs
-    }
-
     public enum ProduceOrConsume
     {
         Produce,
@@ -21,65 +15,53 @@ namespace DistLogDemo
 
     class Program
     {
-        // Coming in C#7.1 static async Task Main(string[] args) and then no .GetAwaiter().Wait() nonsense.
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
-            if (args.Length < 3
-                || !Enum.TryParse<ProduceOrConsume>(args[0], true, out var produceConsumeType)
-                || !Enum.TryParse<DistLogType>(args[1], true, out var distLogType))
+            if (args.Length < 2 || !Enum.TryParse<ProduceOrConsume>(args[0], true, out var produceConsumeType))
             {
-                Console.WriteLine($"Usage: dotnet DistLogDemo {{produce|consume}} {{kafka|azureeventhubs}} TopicName [ConsumerGroupName]");
+                Console.WriteLine("Usage: DistLogDemo {{produce|consume}} Topic(,s) [ConsumerGroupName]/[PartitionKey]");
                 return;
             }
 
-            var topicName = args[2];
-            var consumerGroupName = args.Length >= 4
-                ? args[3]
-                : $"DemoConsumer{Guid.NewGuid()}";
+            var topics = args[1];
+            var consumerGroupOrPartitionKey = args.Length >= 3
+                ? args[2]
+                : null;
 
-            Console.WriteLine($"{produceConsumeType} to/from {distLogType} on Topic {topicName}" + 
+            Console.WriteLine($"{produceConsumeType} to/from Kafka on Topic {topics}" + 
                               (produceConsumeType == ProduceOrConsume.Consume 
-                                  ? $" for Group {consumerGroupName}" 
-                                  : ""));
+                                  ? $" for Group {consumerGroupOrPartitionKey}" 
+                                  : $" with Partition Key {consumerGroupOrPartitionKey}"));
 
             if (produceConsumeType == ProduceOrConsume.Produce)
             {
-                var producer = CreateProducer(distLogType, topicName);
-                Task.WhenAll(Enumerable.Range(0, 10)
-                    .Select(i => producer.Produce($"Message #{i}")))
-                    .Wait();
+                var producer = CreateProducer(topics);
+                const int numMessages = 10;
+                await Task.WhenAll(Enumerable.Range(0, numMessages)
+                    .Select(i => producer.Produce($"Message #{i}", consumerGroupOrPartitionKey)));
+                Console.WriteLine($"{numMessages} sent");
             }
             else
             {
-                var consumer = CreateConsumer(distLogType, topicName, consumerGroupName);
-                consumer.Subscribe(msg => Console.WriteLine($"Message : {msg} received on Topic: {topicName}"));
-                consumer.OnPartitionsAssignedEvent += (sender, s) => Console.WriteLine($"Partitions Assigned : {s}");
+                var consumer = CreateConsumer(topics.Split(","), consumerGroupOrPartitionKey ?? "$Default");
+                consumer.Subscribe((msg, partId) => Console.WriteLine($"Message : {msg} received on Partition {partId}!"));
+                consumer.OnPartitionsAssignedEvent += (sender, s) => Console.WriteLine(s);
+                consumer.OnPartitionsRevokedEvent += (sender, s) => Console.WriteLine(s);
+                consumer.OnError += (sender, err) => Console.WriteLine($"Error : {err}");
                 Console.WriteLine("Consumer Listening - Enter to Quit");
                 Console.ReadLine();
                 consumer.Stop();
             }
         }
 
-        private const string KafkaBrokers = "YourKafkaHere:9092";
-        // Easiest is to copy these from the appropriate resource on the Azure Portal
-        private const string AzureEventHubConnectionString = "Endpoint=sb://xxx/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=xxx";
-        private const string OffsetStorageConnectionString = "DefaultEndpointsProtocol=https;AccountName=youreventhuboffsetsaccountname;AccountKey=xx;EndpointSuffix=core.windows.net";
-        private const string OffsetContainer = "huboffsets";
-
-        // Simple factory methods for either Kafka or AzEventHubs
-        private static IMessageConsumer CreateConsumer(DistLogType distLogType, string topicName, string consumerGroupName)
+        private static IMessageConsumer CreateConsumer(IEnumerable<string> topicName, string consumerGroupName)
         {
-            return distLogType == DistLogType.Kafka
-                ? (IMessageConsumer)new KafkaConsumer(topicName, KafkaBrokers, consumerGroupName)
-                : new EventHubConsumer(AzureEventHubConnectionString, topicName, OffsetStorageConnectionString,
-                    OffsetContainer, consumerGroupName);
+            return new KafkaConsumer(topicName, consumerGroupName);
         }
 
-        private static IMessageProducer CreateProducer(DistLogType distLogType, string topicName)
+        private static IMessageProducer CreateProducer(string topicName)
         {
-            return distLogType == DistLogType.Kafka
-                ? (IMessageProducer) new KafkaProducer(topicName, KafkaBrokers)
-                : new EventHubProducer(AzureEventHubConnectionString, topicName);
+            return new KafkaProducer(topicName);
         }
     }
 }
